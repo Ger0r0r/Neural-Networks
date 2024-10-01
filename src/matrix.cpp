@@ -1,6 +1,6 @@
 #include "matrix.hpp"
 
-matrix::matrix(int ll, int cc, double init_value = 1.0) : rows(ll), cols(cc), data(ll, std::vector<double>(cc, init_value)) {};
+matrix::matrix(int ll, int cc, double init_value = 0.5) : rows(ll), cols(cc), data(ll, std::vector<double>(cc, init_value)) {};
 matrix::~matrix() {};
 
 double& matrix::operator()(int row, int col) {
