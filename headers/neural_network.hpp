@@ -30,6 +30,7 @@ class neural_network {
 
 		void init_weights();
 		void recalc_weights(std::vector <std::vector <double>> & values, std::vector <std::vector <double>> & deltas);
+		double calc_error(std::vector <double> & result, std::vector <double> & aim);
 		std::vector<double> multiply(matrix& m, std::vector<double>& v);
 		std::vector<double> multiply(std::vector<double>& v, matrix& m);
 		std::vector<double> active(std::vector<double>& z);

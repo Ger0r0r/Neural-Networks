@@ -17,6 +17,11 @@ std::vector<double> neural_network::forward(std::vector<double>& input) {
 		a = multiply(weights[i], a);
 		a = active(a);
 	}
+
+	std::vector <double> aim = {0,1,2,3,4,5,6,7,8,9};
+	double MSE_error = calc_error(a, aim);
+	std::cout << "MSE Error " << MSE_error << std::endl;
+
 	return a;
 }
 
@@ -65,12 +70,7 @@ double neural_network::learn(std::vector<double>& input, std::vector<double>& ai
 	// ************************************************************ //
 	std::vector <double> & result = values[layers_num - 1];
 
-	double MSE_error = 0;
-	for (int i = 0; i < layers[layers_num - 1]; i++) {
-		double addition = std::pow(result[i] - aim[i], 2);
-		MSE_error += addition;
-	}
-	MSE_error = std::sqrt(MSE_error);
+	double MSE_error = calc_error(result, aim);
 
 	std::cout << "MSE Error " << MSE_error << std::endl;
 
@@ -237,4 +237,13 @@ std::vector<double> get_rand_container(int size, int minimum, int maximum) {
         rand_input[i] = dis(gen);
     }
 	return rand_input;
+}
+
+double neural_network::calc_error(std::vector <double> & result, std::vector <double> & aim) {
+	double MSE_error = 0;
+	for (int i = 0; i < result.size(); i++) {
+		double addition = std::pow(result[i] - aim[i], 2);
+		MSE_error += addition;
+	}
+	return std::sqrt(MSE_error);
 }
