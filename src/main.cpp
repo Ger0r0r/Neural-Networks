@@ -16,28 +16,32 @@ int main () {
 
 	neural_network stupid_net(layers, Act_Func::LReLU , 0.000000000001);
 
+	std::cout << "Training vector" << std::endl;
     // Инициализируем генератор случайных чисел
-	std::vector rand_input = get_rand_container(layers[0]);
+	std::vector <double> rand_input = get_rand_container(layers[0]);
 
-	std::vector <double> res = stupid_net.forward(rand_input);
-	std::cout << "Training vector\n";
+	// std::vector <double> rand_input = {10,20,30};
+
 	print_container(rand_input);
+	std::vector <double> res = stupid_net.forward(rand_input);
 
-
+	// return 0;
+	// std::cout << "<WARNING>" << std::endl;
 
 	// start = __rdtsc();  // Получение начального значения тактов
 
 	int count_of_iteration = 0;
 
-	double got_error, new_got_error;
+	double got_error, new_got_error = 0.0;
 	do {
 		count_of_iteration++;
 		got_error = new_got_error;
+		// std::cout << "<WARNING>" << std::endl;
 		new_got_error = stupid_net.learn(rand_input, aim);
 
 		rand_input = get_rand_container(layers[0]);
 
-	} while (new_got_error > 0.001 and got_error != new_got_error);
+	} while (new_got_error > 0.001 && got_error != new_got_error && count_of_iteration != 10000);
 
     // end = __rdtsc();  // Получение конечного значения тактов
 
@@ -46,7 +50,7 @@ int main () {
 
 	res = stupid_net.forward(rand_input);
 	print_container(res);
-	std::cout << "Number of ephos " << count_of_iteration << "\n";
+	std::cout << "Number of ephos " << count_of_iteration << std::endl;
 
 	std::cout << "Check\n";
 	for (int i = 0; i < 5; i++) {

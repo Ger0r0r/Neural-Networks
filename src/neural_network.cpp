@@ -7,19 +7,34 @@ neural_network::neural_network(std::vector<int>& layers, Act_Func act, double le
 	}
 
 std::vector<double> neural_network::forward(std::vector<double>& input) {
-	if (input.size() != layers[0]) {
+	if (static_cast<int>(input.size()) != layers[0]) {
 		std::cout << "Wrong input vector to learn\n";
 		return input;
 	}
 
 	std::vector<double> a = input;
-	for (int i = 0; i < weights.size(); ++i) {
-		a = multiply(weights[i], a);
-		a = active(a);
+	for (int i = 0; i < static_cast<int>(weights.size()); ++i) {
+		// std::cout << "a size " << a.size() << "\n";
+		std::vector<double> r (weights[i].getCols());
+		// std::cout << "w check\n";
+		matrix_multiply(a.data(), weights[i].data, r.data(), 1, weights[i].getRows(), weights[i].getCols());
+		// std::cout << "r size " << r.size() << "\n";
+		// std::cout << "r check " << r[0] << "\n";
+		// std::cout << "Multiply " << i + 1 << std::endl;
+		// print_container(a);
+		// std::cout << "By " << i + 1 << std::endl;
+		// weights[i].print();
+		// std::cout << "Result " << i + 1 << std::endl;
+		// print_container(r);
+		a = active(r);
+		// std::cout << "Activate " << i + 1 << std::endl;
+		// print_container(a);
 	}
 
 	std::vector <double> aim = {0,1,2,3,4,5,6,7,8,9};
 	double MSE_error = calc_error(a, aim);
+	std::cout << "Result" << std::endl;
+	print_container(a);
 	std::cout << "MSE Error " << MSE_error << std::endl;
 
 	return a;
@@ -27,19 +42,21 @@ std::vector<double> neural_network::forward(std::vector<double>& input) {
 
 double neural_network::learn(std::vector<double>& input, std::vector<double>& aim) {
 
+	// std::cout << "<WARNING>" << std::endl;
 	int layers_num = layers.size();
 
 	// ************************************************************ //
 	// __________________________CHECK_____________________________ //
 	// ************************************************************ //
-	if (input.size() != layers[0]) {
+	if (static_cast<int>(input.size()) != layers[0]) {
 		std::cout << "Wrong input vector to learn\n";
 		return 0;
 	}
-	if (aim.size() != layers[layers_num - 1]) {
+	if (static_cast<int>(aim.size()) != layers[layers_num - 1]) {
 		std::cout << "Wrong aim vector to learn\n";
 		return 0;
 	}
+	// std::cout << "<WARNING>" << std::endl;
 
 	// ************************************************************ //
 	// _____________________START_OF_LEARNING______________________ //
@@ -58,11 +75,12 @@ double neural_network::learn(std::vector<double>& input, std::vector<double>& ai
 	}
 
 	values[0] = input;
+	// std::cout << "<WARNING>" << std::endl;
 
 	for (int i = 0; i < layers_num - 1; ++i) {
-		values[i+1] = multiply(weights[i], values[i]);
-		values[i+1] = active(values[i+1]);
-
+		std::vector<double> r (weights[i].getCols());
+		matrix_multiply(values[i].data(), weights[i].data,  r.data(), 1, weights[i].getRows(), weights[i].getCols());
+		values[i+1] = active(r);
 	}
 
 	// ************************************************************ //
@@ -72,6 +90,7 @@ double neural_network::learn(std::vector<double>& input, std::vector<double>& ai
 
 	double MSE_error = calc_error(result, aim);
 
+	// std::cout << "<WARNING>" << std::endl;
 	std::cout << "MSE Error " << MSE_error << std::endl;
 
 	// ************************************************************ //
@@ -92,8 +111,22 @@ double neural_network::learn(std::vector<double>& input, std::vector<double>& ai
 	// std::cout << "and aim\n";
 	// print_container(aim);
 
-	for (int i = 0; i < weights.size() - 1; i++) {
-		delta_values[delta_values.size() - 2 - i] = multiply(delta_values[delta_values.size() - 1 - i], weights[weights.size() - 1 - i]);
+
+	// std::cout << "UPDATING WEIGHTS" << std::endl;
+	for (int i = 0; i < static_cast<int>(weights.size()) - 1; i++) {
+
+		// std::cout << "UPDATING WEIGHT " << delta_values.size() - 2 - i << std::endl;
+		// std::cout << "Size of prev " << delta_values[delta_values.size() - 1 - i].size() << std::endl;
+		// std::cout << "Size of next " << delta_values[delta_values.size() - 2 - i].size() << std::endl;
+
+		matrix_multiply(
+			weights[weights.size() - 1 - i].data,
+			delta_values[delta_values.size() - 1 - i].data(),
+			delta_values[delta_values.size() - 2 - i].data(),
+			weights[weights.size() - 1 - i].getRows(),
+			weights[weights.size() - 1 - i].getCols(),
+			1
+		);
 	}
 
 	recalc_weights(values, delta_values);
@@ -106,7 +139,7 @@ void neural_network::recalc_weights(std::vector <std::vector <double>> & values,
 
 	// std::cout << "Sizes " << values.size() << " " << deltas.size() << " " << weights.size() << "\n";
 
-	for (int i = 0; i < weights.size(); i++){
+	for (int i = 0; i < static_cast<int>(weights.size()); i++){
 		// std::cout << "i = " << i << "\n";
 		// std::cout << "Weight " << i << " is " << weights[i].getRows() << " " << weights[i].getCols() << "\n";
 		// std::cout << "Value " << i << " is " << values[i].size() << "\n";
@@ -121,30 +154,35 @@ void neural_network::recalc_weights(std::vector <std::vector <double>> & values,
 }
 
 void neural_network::init_weights() {
-	for (int i = 0; i < layers.size() - 1; ++i) {
-		weights.emplace_back(layers[i], layers[i + 1], 0.5); // инициализация весов как 1
+	for (int i = 0; i < static_cast<int>(layers.size()) - 1; ++i) {
+		// std::cout << "MAKE WEIGHT" << std::endl;
+		weights.emplace_back(layers[i], layers[i+1], 0.5); // инициализация весов как 1
+		// std::cout << "size " << weights.size() << " " << layers[i] << " " << layers[i+1] << std::endl;
+		// std::cout << "CHECK NEW WEIGHT" << std::endl;
+		// weights[i].print();
 	}
+	// std::cout << "DONE" << std::endl;
 }
 
-std::vector<double> neural_network::multiply(matrix& m, std::vector<double>& v) {
-	std::vector<double> result(m.getCols(), 0.0);
-	for (int j = 0; j < m.getCols(); ++j) {
-		for (int i = 0; i < m.getRows(); ++i) {
-			result[j] += m(i, j) * v[i];
-		}
-	}
-	return result;
-}
+// std::vector<double> neural_network::multiply(matrix& m, std::vector<double>& v) {
+// 	std::vector<double> result(m.getCols(), 0.0);
+// 	for (int j = 0; j < m.getCols(); ++j) {
+// 		for (int i = 0; i < m.getRows(); ++i) {
+// 			result[j] += m(i, j) * v[i];
+// 		}
+// 	}
+// 	return result;
+// }
 
-std::vector<double> neural_network::multiply(std::vector<double>& v, matrix& m) {
-	std::vector<double> result(m.getRows(), 0.0);
-	for (int j = 0; j < m.getRows(); ++j) {
-		for (int i = 0; i < m.getCols(); ++i) {
-			result[j] += m(j, i) * v[i];
-		}
-	}
-	return result;
-}
+// std::vector<double> neural_network::multiply(std::vector<double>& v, matrix& m) {
+// 	std::vector<double> result(m.getRows(), 0.0);
+// 	for (int j = 0; j < m.getRows(); ++j) {
+// 		for (int i = 0; i < m.getCols(); ++i) {
+// 			result[j] += m(j, i) * v[i];
+// 		}
+// 	}
+// 	return result;
+// }
 
 std::vector<double> neural_network::active(std::vector<double>& z) {
 	switch (act) {
@@ -173,7 +211,7 @@ std::vector<double> neural_network::diff_active(std::vector<double>& z) {
 
 std::vector<double> neural_network::sigmoid(std::vector<double>& z) {
 	std::vector<double> result(z.size());
-	for (int i = 0; i < z.size(); ++i) {
+	for (int i = 0; i < static_cast<int>(z.size()); ++i) {
 		result[i] = 1.0 / (1.0 + exp(-z[i]));
 	}
 	return result;
@@ -181,7 +219,7 @@ std::vector<double> neural_network::sigmoid(std::vector<double>& z) {
 
 std::vector<double> neural_network::relu(std::vector<double>& z) {
 	std::vector<double> result(z.size());
-	for (int i = 0; i < z.size(); ++i) {
+	for (int i = 0; i < static_cast<int>(z.size()); ++i) {
 		result[i] = (z[i] > 0) ? z[i] : 0; // ReLU
 	}
 	return result;
@@ -189,7 +227,7 @@ std::vector<double> neural_network::relu(std::vector<double>& z) {
 
 std::vector<double> neural_network::lrelu(std::vector<double>& z) {
 	std::vector<double> result(z.size());
-	for (int i = 0; i < z.size(); ++i) {
+	for (int i = 0; i < static_cast<int>(z.size()); ++i) {
 		result[i] = (z[i] > 0) ? z[i] : z[i] / 100;
 	}
 	return result;
@@ -197,7 +235,7 @@ std::vector<double> neural_network::lrelu(std::vector<double>& z) {
 
 std::vector<double> neural_network::diff_sigmoid(std::vector<double>& z) {
 	std::vector<double> result(z.size());
-	for (int i = 0; i < z.size(); ++i) {
+	for (int i = 0; i < static_cast<int>(z.size()); ++i) {
 		result[i] = z[i] * (1 - z[i]);
 	}
 	return result;
@@ -205,7 +243,7 @@ std::vector<double> neural_network::diff_sigmoid(std::vector<double>& z) {
 
 std::vector<double> neural_network::diff_relu(std::vector<double>& z) {
 	std::vector<double> result(z.size());
-	for (int i = 0; i < z.size(); ++i) {
+	for (int i = 0; i < static_cast<int>(z.size()); ++i) {
 		result[i] = (z[i] > 0) ? 1 : 0;
 	}
 	return result;
@@ -213,15 +251,16 @@ std::vector<double> neural_network::diff_relu(std::vector<double>& z) {
 
 std::vector<double> neural_network::diff_lrelu(std::vector<double>& z) {
 	std::vector<double> result(z.size());
-	for (int i = 0; i < z.size(); ++i) {
+	for (int i = 0; i < static_cast<int>(z.size()); ++i) {
 		result[i] = (z[i] > 0) ? 1 : 0.01;
 	}
 	return result;
 }
 
 void print_container(const std::vector<double>& c) {
-    for (double i : c)
+    for (double i : c) {
         std::cout << i << ' ';
+	}
 	std::cout << '\n';
 }
 
@@ -241,9 +280,13 @@ std::vector<double> get_rand_container(int size, int minimum, int maximum) {
 
 double neural_network::calc_error(std::vector <double> & result, std::vector <double> & aim) {
 	double MSE_error = 0;
-	for (int i = 0; i < result.size(); i++) {
+	// std::cout << "TEST " << MSE_error << "\n";
+	// print_container(result);
+	// print_container(aim);
+	for (int i = 0; i < static_cast<int>(result.size()); i++) {
 		double addition = std::pow(result[i] - aim[i], 2);
 		MSE_error += addition;
 	}
+	// std::cout << "TEST " << MSE_error << "\n";
 	return std::sqrt(MSE_error);
 }
