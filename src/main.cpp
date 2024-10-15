@@ -14,7 +14,7 @@ int main () {
 	std::vector <int> layers = {100, 1000, 10};
 	std::vector <double> aim = {0,1,2,3,4,5,6,7,8,9};
 
-	neural_network stupid_net(layers, Act_Func::LReLU , 0.000000000001);
+	neural_network stupid_net(layers, Act_Func::LReLU, 0.00000000000001);
 
 	std::cout << "Training vector" << std::endl;
     // Инициализируем генератор случайных чисел
@@ -41,7 +41,8 @@ int main () {
 
 		rand_input = get_rand_container(layers[0]);
 
-	} while (new_got_error > 0.001 && got_error != new_got_error && count_of_iteration != 10000);
+	// } while (new_got_error > 0.0001 && got_error != new_got_error && count_of_iteration != 100000);
+	} while (new_got_error > 0.00001 && got_error != new_got_error);
 
     // end = __rdtsc();  // Получение конечного значения тактов
 

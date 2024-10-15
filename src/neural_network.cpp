@@ -17,7 +17,7 @@ std::vector<double> neural_network::forward(std::vector<double>& input) {
 		// std::cout << "a size " << a.size() << "\n";
 		std::vector<double> r (weights[i].getCols());
 		// std::cout << "w check\n";
-		matrix_multiply(a.data(), weights[i].data, r.data(), 1, weights[i].getRows(), weights[i].getCols());
+		matrix_multiply_v_m(a.data(), weights[i].data, r.data(), weights[i].getRows(), weights[i].getCols());
 		// std::cout << "r size " << r.size() << "\n";
 		// std::cout << "r check " << r[0] << "\n";
 		// std::cout << "Multiply " << i + 1 << std::endl;
@@ -79,7 +79,7 @@ double neural_network::learn(std::vector<double>& input, std::vector<double>& ai
 
 	for (int i = 0; i < layers_num - 1; ++i) {
 		std::vector<double> r (weights[i].getCols());
-		matrix_multiply(values[i].data(), weights[i].data,  r.data(), 1, weights[i].getRows(), weights[i].getCols());
+		matrix_multiply_v_m(values[i].data(), weights[i].data, r.data(), weights[i].getRows(), weights[i].getCols());
 		values[i+1] = active(r);
 	}
 
@@ -119,13 +119,12 @@ double neural_network::learn(std::vector<double>& input, std::vector<double>& ai
 		// std::cout << "Size of prev " << delta_values[delta_values.size() - 1 - i].size() << std::endl;
 		// std::cout << "Size of next " << delta_values[delta_values.size() - 2 - i].size() << std::endl;
 
-		matrix_multiply(
+		matrix_multiply_m_v(
 			weights[weights.size() - 1 - i].data,
 			delta_values[delta_values.size() - 1 - i].data(),
 			delta_values[delta_values.size() - 2 - i].data(),
 			weights[weights.size() - 1 - i].getRows(),
-			weights[weights.size() - 1 - i].getCols(),
-			1
+			weights[weights.size() - 1 - i].getCols()
 		);
 	}
 
@@ -261,7 +260,7 @@ void print_container(const std::vector<double>& c) {
     for (double i : c) {
         std::cout << i << ' ';
 	}
-	std::cout << '\n';
+	std::cout << std::endl;
 }
 
 std::vector<double> get_rand_container(int size, int minimum, int maximum) {

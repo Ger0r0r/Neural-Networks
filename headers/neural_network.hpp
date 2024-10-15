@@ -15,6 +15,18 @@ enum class Act_Func {
 	LReLU
 };
 
+// Перечисление для выбора метода обучения
+enum class Grad_Func {
+	Grad,
+	Momentum,
+	Nesterov,
+	AdMomentum,
+	AdNesterov,
+	Adagrad,
+	RMSProp,
+	Adam
+};
+
 class neural_network {
 	public:
 		neural_network(std::vector<int>& layers, Act_Func act, double learn_factor);
