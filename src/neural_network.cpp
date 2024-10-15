@@ -40,7 +40,7 @@ std::vector<double> neural_network::forward(std::vector<double>& input) {
 	return a;
 }
 
-double neural_network::learn(std::vector<double>& input, std::vector<double>& aim) {
+double neural_network::learn(std::vector<double>& input, std::vector<double>& aim, int epoch) {
 
 	// std::cout << "<WARNING>" << std::endl;
 	int layers_num = layers.size();
@@ -128,14 +128,16 @@ double neural_network::learn(std::vector<double>& input, std::vector<double>& ai
 		);
 	}
 
-	recalc_weights(values, delta_values);
+	recalc_weights(values, delta_values, epoch);
 
 	// std::cout << "EEEE" << std::endl;
 	return MSE_error;
 }
 
-void neural_network::recalc_weights(std::vector <std::vector <double>> & values, std::vector <std::vector <double>> & deltas) {
+void neural_network::recalc_weights(std::vector <std::vector <double>> & values, std::vector <std::vector <double>> & deltas, int epoch) {
 
+	double correction_momentum = 1 - std::pow(BETA_MOMENTUM, epoch);
+	double correction_gradient = 1 - std::pow(BETA_GRADIENT, epoch);
 	// std::cout << "Sizes " << values.size() << " " << deltas.size() << " " << weights.size() << "\n";
 
 	for (int i = 0; i < static_cast<int>(weights.size()); i++){
@@ -145,8 +147,15 @@ void neural_network::recalc_weights(std::vector <std::vector <double>> & values,
 		// std::cout << "Delta " << i << " is " << deltas[i].size() << "\n";
 		for (int j = 0; j < weights[i].getRows(); j++) {
 			for (int k = 0; k < weights[i].getCols(); k++) {
+				double grad = values[i][j] * deltas[i][k];
 
-				weights[i](j,k) = weights[i](j,k) - learn_factor * values[i][j] * deltas[i][k];
+				momentum[i](j,k) = momentum[i](j,k) * BETA_MOMENTUM + (1 - BETA_MOMENTUM) * grad;
+				sqgrad[i](j,k) = sqgrad[i](j,k) * BETA_GRADIENT + (1 - BETA_GRADIENT) * grad * grad;
+
+				double new_momentum = momentum[i](j,k) / correction_momentum;
+				double new_gradient = sqgrad[i](j,k) / correction_gradient;
+
+				weights[i](j,k) = weights[i](j,k) - learn_factor * new_momentum / (std::sqrt(new_gradient + BORDER_FROM_ZERO));
 			}
 		}
 	}
@@ -155,10 +164,14 @@ void neural_network::recalc_weights(std::vector <std::vector <double>> & values,
 void neural_network::init_weights() {
 	for (int i = 0; i < static_cast<int>(layers.size()) - 1; ++i) {
 		// std::cout << "MAKE WEIGHT" << std::endl;
-		weights.emplace_back(layers[i], layers[i+1], 0.5); // инициализация весов как 1
+		weights.emplace_back(layers[i], layers[i+1], 0.5);
 		// std::cout << "size " << weights.size() << " " << layers[i] << " " << layers[i+1] << std::endl;
 		// std::cout << "CHECK NEW WEIGHT" << std::endl;
 		// weights[i].print();
+
+
+		momentum.emplace_back(layers[i], layers[i+1], 0.0);
+		sqgrad.emplace_back(layers[i], layers[i+1], 0.0);
 	}
 	// std::cout << "DONE" << std::endl;
 }
@@ -288,4 +301,9 @@ double neural_network::calc_error(std::vector <double> & result, std::vector <do
 	}
 	// std::cout << "TEST " << MSE_error << "\n";
 	return std::sqrt(MSE_error);
+}
+
+
+void neural_network::update_learning_factor (double new_learn_factor) {
+	learn_factor = new_learn_factor;
 }
