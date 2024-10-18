@@ -35,7 +35,7 @@ class neural_network {
 	public:
 		neural_network(std::vector<int>& layers, Act_Func act, double learn_factor);
 
-		std::vector<double> forward(std::vector<double>& input);
+		std::vector<double> forward(std::vector<double>& input, std::vector<double>& aim);
 		double learn(std::vector<double>& input, std::vector<double>& aim, int epoch);
 		void update_learning_factor (double new_learn_factor);
 
@@ -49,13 +49,19 @@ class neural_network {
 
 		void init_weights();
 		void recalc_weights(std::vector <std::vector <double>> & values, std::vector <std::vector <double>> & deltas, int epoch);
-		double calc_error(std::vector <double> & result, std::vector <double> & aim);
+		inline double calc_error(std::vector <double> & result, std::vector <double> & aim);
 		std::vector<double> multiply(matrix& m, std::vector<double>& v);
 		std::vector<double> multiply(std::vector<double>& v, matrix& m);
+
 		std::vector<double> active(std::vector<double>& z);
+
 		std::vector<double> diff_active(std::vector<double>& z);
+
+
 		std::vector<double> sigmoid(std::vector<double>& z);
+
 		std::vector<double> relu(std::vector<double>& z);
+
 		std::vector<double> lrelu(std::vector<double>& z);
 		std::vector<double> diff_sigmoid(std::vector<double>& z);
 		std::vector<double> diff_relu(std::vector<double>& z);

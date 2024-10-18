@@ -4,12 +4,32 @@
 #include <numeric>
 #include <utility>
 #include <vector>
-// #include <x86intrin.h>  // Для использования rdtsc
 #include "neural_network.hpp"
+#include <windows.h>
+#include <chrono>
+
+// Функция для получения времени, затраченного процессом на CPU
+double getCpuTime() {
+	FILETIME createTime, exitTime, kernelTime, userTime;
+	if (GetProcessTimes(GetCurrentProcess(), &createTime, &exitTime, &kernelTime, &userTime)) {
+		// Преобразуем FILETIME в 64-битное значение
+		ULARGE_INTEGER uKernelTime;
+		uKernelTime.LowPart = kernelTime.dwLowDateTime;
+		uKernelTime.HighPart = kernelTime.dwHighDateTime;
+
+		ULARGE_INTEGER uUserTime;
+		uUserTime.LowPart = userTime.dwLowDateTime;
+		uUserTime.HighPart = userTime.dwHighDateTime;
+
+		// Суммируем время в пользовательском и системном режимах и переводим в секунды
+		return (uKernelTime.QuadPart + uUserTime.QuadPart) / 1e7; // 1e7 - для перевода в секунды
+	}
+	return 0.0;
+}
 
 int main () {
 
-    // unsigned long long start, end;
+	SetConsoleOutputCP(CP_UTF8);
 
 	std::vector <int> layers = {100, 1000, 10};
 	std::vector <double> aim = {0,1,2,3,4,5,6,7,8,9};
@@ -19,58 +39,67 @@ int main () {
 	neural_network stupid_net(layers, Act_Func::LReLU, l_factor);
 
 	std::cout << "Training vector" << std::endl;
-    // Инициализируем генератор случайных чисел
-	std::vector <double> rand_input = get_rand_container(layers[0], 0, 9);
+	std::vector <double> rand_input = get_rand_container(layers[0]);
 	// std::fill(rand_input.data(), rand_input.data() + 100, 5);
 
-	// std::vector <double> rand_input = {10,20,30};
-
 	print_container(rand_input);
-	std::vector <double> res = stupid_net.forward(rand_input);
+	std::vector <double> res = stupid_net.forward(rand_input, aim);
 
 	// return 0;
-	// std::cout << "<WARNING>" << std::endl;
-
-	// start = __rdtsc();  // Получение начального значения тактов
 
 	int count_of_iteration = 0;
-
+	double sum_errors = 0;
+	std::vector <double> errors (100, 0);
 	double got_error, new_got_error = 0.0;
+	bool condition_to_stop = 1;
+
+
+	SYSTEM_INFO sysInfo;
+	GetSystemInfo(&sysInfo);
+	unsigned int numCores = sysInfo.dwNumberOfProcessors;
+	auto startRealTime = std::chrono::high_resolution_clock::now();
+	double startCpuTime = getCpuTime();
+
 	do {
 		count_of_iteration++;
 		got_error = new_got_error;
-		// std::cout << "<WARNING>" << std::endl;
 		new_got_error = stupid_net.learn(rand_input, aim, count_of_iteration);
 
-		rand_input = get_rand_container(layers[0], 0, 9);
-
-		if (count_of_iteration == 2000) {
-			l_factor /= 1000000;
-			stupid_net.update_learning_factor(l_factor);
-			std::cout << "~~~~~~~~~~ UPDATE ~~~~~~~~~~" << std::endl;
+		if (count_of_iteration > 100) {
+			sum_errors -= errors.data()[(count_of_iteration - 1) % 100];
 		}
-		if (count_of_iteration == 4000) {
-			l_factor /= 1000000;
-			stupid_net.update_learning_factor(l_factor);
-			std::cout << "~~~~~~~~~~ UPDATE ~~~~~~~~~~" << std::endl;
-		}
+		errors.data()[(count_of_iteration - 1) % 100] = new_got_error;
+		sum_errors += errors.data()[(count_of_iteration - 1) % 100];
 
-	} while (new_got_error > 0.0001 && got_error != new_got_error && count_of_iteration != 6000);
+		// std::cout << "MSE Error " << new_got_error << " mean " << sum_errors / 100 << std::endl;
+
+		rand_input = get_rand_container(layers[0]);
+
+		condition_to_stop = !(count_of_iteration > 100 && std::abs((sum_errors / 100) - new_got_error) < 0.1);
+
+	} while (new_got_error > 0.0001 && got_error != new_got_error && count_of_iteration != 5000 && condition_to_stop);
 	// } while (new_got_error > 0.001 && got_error != new_got_error);
 
-    // end = __rdtsc();  // Получение конечного значения тактов
+	auto endRealTime = std::chrono::high_resolution_clock::now();
+	double endCpuTime = getCpuTime();
+	double totalCpuTime = endCpuTime - startCpuTime;
+	std::chrono::duration<double> realTime = endRealTime - startRealTime;
+	double cpuUsagePercent = (totalCpuTime / (realTime.count() * numCores)) * 100;
 
-    // std::cout << "Количество тактов процессора: " << (end - start) << " тактов\n";
+	std::cout << "Общее CPU время: " << totalCpuTime << " секунд" << std::endl;
+	std::cout << "Реальное время выполнения: " << realTime.count() << " секунд" << std::endl;
+	std::cout << "Количество логических ядер: " << numCores << std::endl;
+	std::cout << "Процент загрузки CPU программой (учитывая все ядра): " << cpuUsagePercent << "%" << std::endl;
 
 
-	res = stupid_net.forward(rand_input);
+	res = stupid_net.forward(rand_input, aim);
 	print_container(res);
 	std::cout << "Number of ephos " << count_of_iteration << std::endl;
 
 	std::cout << "Check\n";
 	for (int i = 0; i < 5; i++) {
-		stupid_net.forward(rand_input);
-		rand_input = get_rand_container(layers[0], 0, 9);
+		stupid_net.forward(rand_input, aim);
+		rand_input = get_rand_container(layers[0]);
 	}
 
 	return 0;
