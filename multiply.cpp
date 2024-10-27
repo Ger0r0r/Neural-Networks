@@ -1,142 +1,96 @@
+#include <Eigen/Dense>
 #include <iostream>
-#include <vector>
-#include <immintrin.h>  // Для работы с SIMD
-#include <omp.h>        // Для многопоточности
-#include <algorithm>
-#include <cassert>
-#include <utility>
-#include <numeric>
-#include <windows.h>
 #include <chrono>
-#include <Eigen/Dense> // Подключаем основной заголовочный файл Eigen
-#include <ctime>
-#include <random>
+#include <omp.h>
+#include <immintrin.h> // Для SIMD команд
+#include <cstdlib>     // Для функции rand()
 
-#define BLOCK_SIZE 32  // Размер блока для оптимизации кэша
+int main() {
+    const double maxDuration = 10.0; // Максимальное время выполнения в секундах
 
+    // --- Eigen умножение ---
+    {
+        int N = 64;
 
-void matrix_multiply(const double* M, const double* V, double* R, int n) {
-	double* MT = new double[n * n];
+        while (true) {
+            // Создаем две случайные матрицы размером N x N
+            Eigen::MatrixXd A = Eigen::MatrixXd::Random(N, N);
+            Eigen::MatrixXd B = Eigen::MatrixXd::Random(N, N);
 
-	for (int i = 0; i < n; ++i) {
-		for (int j = 0; j < n; ++j) {
-			MT[j * n + i] = M[i * n + j];
-		}
-	}
+            // Измеряем время умножения
+            auto start = std::chrono::high_resolution_clock::now();
+            Eigen::MatrixXd C = A * B;
+            auto end = std::chrono::high_resolution_clock::now();
 
-	#pragma omp parallel for
-	for (int i = 0; i < n; i += BLOCK_SIZE) {
-		// std::cout << "Iter i " << i << std::endl;
-		for (int j = 0; j < n; j += BLOCK_SIZE) {
-			// std::cout << "Iter j " << j << std::endl;
-			// Блоки умножаются блоками
-			for (int ii = i; ii < i + BLOCK_SIZE && ii < n; ++ii) {
-				// std::cout << "Iter ii " << ii << std::endl;
-				double sum = 0.0;
-				int jj = j;
-				// SIMD обработка блоков кратных 4
-				for (; jj <= n - 4 && jj < j + BLOCK_SIZE; jj += 4) {
-					// std::cout << "Iter 1 jj " << jj << std::endl;
-					__m256d a = _mm256_loadu_pd(&V[ii * n + jj]);  // Загружаем 4 элемента из V
-					__m256d b = _mm256_loadu_pd(&MT[ii * n + jj]);
-					__m256d prod = _mm256_mul_pd(a, b);  // Умножаем
-					__m256d hsum = _mm256_hadd_pd(prod, prod);  // Суммируем попарно
-					sum += ((double*)&hsum)[0] + ((double*)&hsum)[2];  // Собираем сумму элементов
-				}
-				// Суммируем результат
-				R[ii] += sum;
-			}
-		}
-	}
-	delete [] MT;
-	// std::cout << "MM done\n";
-}
+            // Вычисляем прошедшее время в секундах
+            std::chrono::duration<double> duration = end - start;
+            std::cout << "Eigen multiplication for size " << N << " took " << duration.count() << " seconds" << std::endl;
 
-// Функция для получения времени, затраченного процессом на CPU
-double getCpuTime() {
-	FILETIME createTime, exitTime, kernelTime, userTime;
-	if (GetProcessTimes(GetCurrentProcess(), &createTime, &exitTime, &kernelTime, &userTime)) {
-		// Преобразуем FILETIME в 64-битное значение
-		ULARGE_INTEGER uKernelTime;
-		uKernelTime.LowPart = kernelTime.dwLowDateTime;
-		uKernelTime.HighPart = kernelTime.dwHighDateTime;
+            if (duration.count() > maxDuration) {
+                break;
+            }
 
-		ULARGE_INTEGER uUserTime;
-		uUserTime.LowPart = userTime.dwLowDateTime;
-		uUserTime.HighPart = userTime.dwHighDateTime;
+            N += 64; // Увеличиваем размер матрицы
+        }
+    }
 
-		// Суммируем время в пользовательском и системном режимах и переводим в секунды
-		return (uKernelTime.QuadPart + uUserTime.QuadPart) / 1e7; // 1e7 - для перевода в секунды
-	}
-	return 0.0;
-}
+    // --- Ручное умножение с блокировкой, OpenMP и SIMD ---
+    {
+        const int blockSize = 32;
+        int N = 64;
 
-int main () {
+        while (true) {
+            // Инициализация матриц
+            double* A = new double[N * N];
+            double* B = new double[N * N];
+            double* C = new double[N * N]();
 
+            // Заполнение матриц случайными значениями
+            for (int i = 0; i < N * N; ++i) {
+                A[i] = static_cast<double>(rand()) / RAND_MAX;
+                B[i] = static_cast<double>(rand()) / RAND_MAX;
+            }
 
-	srand(static_cast<unsigned int>(time(0)));
-	std::random_device rd;  // Получаем случайное начальное значение
-    std::mt19937 gen(rd()); // Инициализируем генератор
-    std::uniform_real_distribution<> dis(0.0, 10.0); // Устанавливаем диапазон
+            // Измеряем время умножения
+            auto start = std::chrono::high_resolution_clock::now();
 
-	SYSTEM_INFO sysInfo;
-	GetSystemInfo(&sysInfo);
-	unsigned int numCores = sysInfo.dwNumberOfProcessors;
-	std::cout << "Количество логических ядер: " << numCores << std::endl;
+            #pragma omp parallel for collapse(2)
+            for (int i = 0; i < N; i += blockSize) {
+                for (int j = 0; j < N; j += blockSize) {
+                    for (int k = 0; k < N; k += blockSize) {
+                        for (int ii = 0; ii < blockSize; ++ii) {
+                            for (int jj = 0; jj < blockSize; ++jj) {
+                                __m256d c = _mm256_loadu_pd(&C[(i + ii) * N + (j + jj)]);
+                                for (int kk = 0; kk < blockSize; kk += 4) {
+                                    __m256d a = _mm256_loadu_pd(&A[(i + ii) * N + (k + kk)]);
+                                    __m256d b = _mm256_loadu_pd(&B[(k + kk) * N + (j + jj)]);
+                                    c = _mm256_add_pd(c, _mm256_mul_pd(a, b));
+                                }
+                                _mm256_storeu_pd(&C[(i + ii) * N + (j + jj)], c);
+                            }
+                        }
+                    }
+                }
+            }
 
-	int i = 0;
-	bool flag = 1;
-	while (flag) {
-		i++;
-		const int size = i * 64;
-		Eigen::MatrixXf mat1(size, size);
-		Eigen::MatrixXf mat2(size, size);
-		mat1 = Eigen::MatrixXf::Random(size, size); // Диапазон [0, 10]
-		mat1 = (mat1 + Eigen::MatrixXf::Constant(size, size, 1)) * 5;
-        mat2 = Eigen::MatrixXf::Random(size, size);
-		mat2 = (mat2 + Eigen::MatrixXf::Constant(size, size, 1)) * 5;
-		auto startRealTime = std::chrono::high_resolution_clock::now();
+            auto end = std::chrono::high_resolution_clock::now();
 
-		Eigen::MatrixXf result = mat1 * mat2;
+            // Вычисляем прошедшее время в секундах
+            std::chrono::duration<double> duration = end - start;
+            std::cout << "Manual block multiplication with OpenMP and SIMD for size " << N << " took " << duration.count() << " seconds" << std::endl;
 
-		auto endRealTime = std::chrono::high_resolution_clock::now();
-		std::chrono::duration<double> realTime = endRealTime - startRealTime;
-		double time_result = realTime.count();
-		std::cout << "EIGEN: " << size << " " << time_result << std::endl;
+            // Освобождаем память
+            delete[] A;
+            delete[] B;
+            delete[] C;
 
-		if (time_result > 10) break;
+            if (duration.count() > maxDuration) {
+                break;
+            }
 
-	}
+            N += 64; // Увеличиваем размер матрицы
+        }
+    }
 
-
-	i = 0;
-	flag = 1;
-	while (flag) {
-		i++;
-		int size = i * 64;
-		double* arr_1 = new double[size*size];
-		double* arr_2 = new double[size*size];
-		double* arr_r = new double[size*size];
-		for (int i = 0; i < size; ++i) {
-			arr_1[i] = dis(gen);
-			arr_2[i] = dis(gen);
-		}
-		auto startRealTime = std::chrono::high_resolution_clock::now();
-
-		matrix_multiply(arr_1,arr_2,arr_r,size);
-
-		auto endRealTime = std::chrono::high_resolution_clock::now();
-		std::chrono::duration<double> realTime = endRealTime - startRealTime;
-		double time_result = realTime.count();
-		std::cout << "SIMD: " << size << " " << time_result << std::endl;
-
-		delete [] arr_1;
-		delete [] arr_2;
-		delete [] arr_r;
-
-		if (time_result > 10) break;
-
-	}
-
-	return 0;
+    return 0;
 }
